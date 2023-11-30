@@ -1,8 +1,10 @@
 import "./App.css";
-import React from 'react'
+import React from "react";
 function App() {
-  const [aramaMetni, setAramaMetni] = React.
-  useState(localStorage.getItem("aranan")||"React");
+  const [aramaMetni, setAramaMetni] = React.useState(
+    localStorage.getItem("aranan") || "React"
+  );
+
   const yaziListesi = [
     {
       baslik: "React Öğreniyorum",
@@ -21,57 +23,127 @@ function App() {
       id: 1,
     },
   ];
-  React.useEffect(()=>{
-    localStorage.setItem("aranan",aramaMetni);
-  },[aramaMetni]);
+  function getAsyncPosts() {
+    return new Promise((resolve) =>
+      setTimeout(() => resolve({ data: { yazilar: yaziListesi } }), 2000)
+    );
+  }
 
-  const arananYazilar=yaziListesi.filter(
-    function(yazi){
-      return yazi.baslik.toLowerCase().includes(aramaMetni.toLowerCase())||
-      yazi.yazar.toLowerCase().includes(aramaMetni.toLowerCase());
-   
+  const yazilarReducer = (state, action) => {
+    switch (action.type) {
+      case "POSTS_FETCH_INIT":
+        return {
+          ...state,
+          isLoading: true,
+          isError: false,
+        };
+      case "POSTS_FETCH_SUCCESS":
+        return {
+          ...state,
+          isLoading: false,
+          isError: false,
+          data: action.payload,
+        };
+      case "POSTS_FETCH_FAILURE":
+        return {
+          ...state,
+          isLoading: false,
+          isError: true,
+        };
+      case "REMOVE_POST":
+        return {
+          ...state,
+          data: state.data.filter((post) => action.payload !== post.id),
+        };
+      default:
+        throw new Error();
     }
-  );
-  // 1. aşama callback handler metodu oluşturma
-  function handleSearch(event){
+  };
+  const [yazilar, dispatchYazilar] = React.useReducer(yazilarReducer, {
+    data: [],
+    isLoading: false,
+    isError: false,
+  });
+  const arananYazilar = yazilar.data.filter(function (yazi) {
+    return (
+      yazi.baslik.toLowerCase().includes(aramaMetni.toLowerCase()) ||
+      yazi.yazar.toLowerCase().includes(aramaMetni.toLowerCase())
+    );
+  });
+  React.useEffect(() => {
+    localStorage.setItem("aranan", aramaMetni);
+  }, [aramaMetni]);
+
+  React.useEffect(() => {
+    handleFetchPosts();
+  }, []);
+
+  const handleFetchPosts = React.useCallback(() => {
+    dispatchYazilar({ type: "POSTS_FETCH_INIT" });
+    getAsyncPosts()
+      .then((result) => {
+        dispatchYazilar({
+          type: "POSTS_FETCH_SUCCESS",
+          payload: result.data.yazilar,
+        });
+      })
+      .catch(() => dispatchYazilar({ type: "POSTS_FETCH_FAILURE" }));
+  });
+  function handleRemovePost(tiklananYaziId) {
+    dispatchYazilar({
+      type: "REMOVE_POST",
+      payload: tiklananYaziId,
+    });
+  }
+  function handleSearch(event) {
     setAramaMetni(event.target.value);
   }
   return (
     <div>
       <h1>Yazılar</h1>
-      <Arama aramaMetni={aramaMetni} onSearch={handleSearch} />
-      <p>
-        <strong>{aramaMetni} aranıyor...</strong>.
-      </p>
+      <InputWithLabel
+        id="arama"
+        value={aramaMetni}
+        label="Ara"
+        type="text"
+        onInputChange={handleSearch}
+      />
+      {aramaMetni && (
+        <p>
+          <strong>{aramaMetni} aranıyor...</strong>.
+        </p>
+      )}
       <hr />
-      <Liste yazilar={arananYazilar} />
+      {yazilar.isError ? (
+        <p>Birşeyler ters gitti!</p>
+      ) : yazilar.isLoading ? (
+        <p>Yükleniyor...</p>
+      ) : (
+        <Liste yazilar={arananYazilar} onRemovePost={handleRemovePost} />
+      )}
     </div>
   );
 }
-function Arama({aramaMetni,onSearch}) {
-  const handleChange = (event) => {
-    onSearch(event);
-  };
+function InputWithLabel({ id, label, value, type, onInputChange }) {
   return (
     <div>
-      <label htmlFor="arama">Ara: </label>
-      <input id="arama" type="text" onChange={handleChange}
-       value={aramaMetni} />
+      <label htmlFor={id}>{label}: </label>
+      <input id={id} type={type} onChange={onInputChange} value={value} />
     </div>
   );
 }
-function Liste(props) {
+function Liste({ yazilar, onRemovePost }) {
   return (
     <div>
       <ul>
-        {props.yazilar.map(function (yazi) {
-          return <Yazi key={yazi.id} {...yazi} />;
+        {yazilar.map(function (yazi) {
+          return <Yazi key={yazi.id} {...yazi} onRemovePost={onRemovePost} />;
         })}{" "}
       </ul>
     </div>
   );
 }
-function Yazi({id,url,baslik,yazar,yorum_sayisi,puan}) {
+function Yazi({ id, url, baslik, yazar, yorum_sayisi, puan, onRemovePost }) {
   return (
     <li key={id}>
       <span>
@@ -85,6 +157,11 @@ function Yazi({id,url,baslik,yazar,yorum_sayisi,puan}) {
       </span>
       <span>
         <b>Puan:</b> {puan}
+      </span>
+      <span>
+        <button type="button" onClick={() => onRemovePost(id)}>
+          Sil
+        </button>
       </span>
     </li>
   );
