@@ -1,6 +1,9 @@
 import "./App.css";
 import React from "react";
+import axios from "axios";
 function App() {
+  const API_ENDPOINT =
+    "https://my-json-server.typicode.com/asimsinan/mockapi/dersler";
   const [aramaMetni, setAramaMetni] = React.useState(
     localStorage.getItem("aranan") || "React"
   );
@@ -80,11 +83,12 @@ function App() {
 
   const handleFetchPosts = React.useCallback(() => {
     dispatchYazilar({ type: "POSTS_FETCH_INIT" });
-    getAsyncPosts()
+    axios
+      .get(API_ENDPOINT)
       .then((result) => {
         dispatchYazilar({
           type: "POSTS_FETCH_SUCCESS",
-          payload: result.data.yazilar,
+          payload: result.data.data,
         });
       })
       .catch(() => dispatchYazilar({ type: "POSTS_FETCH_FAILURE" }));
